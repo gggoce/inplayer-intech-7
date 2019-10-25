@@ -5,3 +5,5 @@
 ## workflow  
 ---
 ## resources  
+
+- [AWS CDK examples](https://github.com/aws-samples/aws-cdk-examples)
