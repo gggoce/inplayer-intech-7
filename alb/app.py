@@ -33,6 +33,9 @@ class LoadBalancerStack(core.Stack):
         lb = elbv2.ApplicationLoadBalancer(
             self, "LB",
             vpc=vpc,
+            min_capacity=1,
+            max_capacity=3,
+            desired_capacity=2,
             internet_facing=True)
 
         listener = lb.add_listener("Listener", port=80)
@@ -44,5 +47,8 @@ class LoadBalancerStack(core.Stack):
 
 
 app = core.App()
-LoadBalancerStack(app, "LoadBalancerStack", env={'region': 'eu-central-1'})
+LoadBalancerStack(app, "LoadBalancerStack")
 app.synth()
+
+
+#https://docs.aws.amazon.com/cdk/api/latest/python/aws_cdk.aws_autoscaling/AutoScalingGroup.html

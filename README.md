@@ -3,6 +3,20 @@
 ![alt text](workshop.png?raw=true "InTech")  
 ---
 ## workflow  
+
+- ```node --version```
+- ```npm --version```  
+- ```python --version```  
+- ```npm install -g aws-cdk```  
+- ```cdk --version```  
+- ```git clone https://github.com/gggoce/inplayer-intech-7.git```  
+- choose a random name for the folder "cdk-workshop" from the command below for better visibility in cloudformation console     
+```mkdir cdk-workshop && cd cdk-workshop```  
+- ```cdk init app --language python```
+- ```source .env/bin/activate```
+- ```pip install -r requirements.txt```
+- ```export AWS_DEFAULT_REGION=eu-central-1```
+-
 ---
 ## resources  
 
