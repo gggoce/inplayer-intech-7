@@ -1,0 +1,354 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description:
+app shared elements
+
+Parameters:
+
+  VpcCidr:
+    Type: String
+    Description: VPC CIDR block.
+    Default: 192.168.0.0/16
+
+  RdsPrivateSubnet1Cidr:
+    Type: String
+    Description: Private RDS subnet 1 CIDR block.
+    Default: 192.168.1.0/24
+
+  RdsPrivateSubnet2Cidr:
+    Type: String
+    Description: Private RDS subnet 2 CIDR block.
+    Default: 192.168.2.0/24
+
+  BeanstalkLBPublicSubnet1Cidr:
+    Type: String
+    Description: Private Beanstalk LB subnet 1 CIDR block.
+    Default: 192.168.3.0/24
+
+  BeanstalkLBPublicSubnet2Cidr:
+    Type: String
+    Description: Private Beanstalk LB subnet 2 CIDR block.
+    Default: 192.168.6.0/24        
+
+  AppAndRdsName:
+    Type: String
+    Description: Name of the beanstalk app and the RDS DB.
+    Default: Application    
+  
+  MasterUser:
+    Type : 'AWS::SSM::Parameter::Value<String>'
+    Default: MasterUser
+
+  MasterUserPassword:
+    Type : 'AWS::SSM::Parameter::Value<String>'
+    Default: MasterUserPassword   
+
+  DBInstanceClass:
+    Type: String
+    Description: instance class for the RDS DB
+    Default: db.t2.medium  
+
+  BackupRetentionPeriod:
+    Type: String
+    Description: something
+    Default: 1  
+
+  AllocatedStorage:
+    Type: String
+    Description: db storage in GB
+    Default: 5   
+
+  StorageEncrypted:
+    Type: String
+    Description: encrypt storage (true, false)
+    Default: false            
+
+Resources:
+
+# Create VPC  
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties: 
+      CidrBlock: !Ref VpcCidr
+      Tags: 
+      - Key: Name
+        Value: gocevpc
+
+# Create Internet gateway
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+      - Key: Name
+        Value: goceinternetgateway
+
+# Attached the created internet gateway to the VPC
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+        VpcId:
+          Ref: VPC
+        InternetGatewayId:
+          Ref: InternetGateway
+
+# Create a route table for the BeanstalkLBpublicsubnet
+  CustomRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+        VpcId:
+            Ref: VPC
+        Tags:
+          - Key: Name
+            Value: goceroutetable          
+
+# Create a route table for the private subnets
+  MainRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+        VpcId:
+            Ref: VPC
+        Tags:
+          - Key: Name
+            Value: goceroutetable
+
+# Configure route in the route table for the private subnets to te NAT
+  CustomRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGateway
+    Properties:
+      RouteTableId:
+        Ref: MainRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: NAT            
+
+# Configure route in the route table for the BeanstalkLBpublicsubnet for the internet gateway traffic 
+  CustomRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGateway
+    Properties:
+      RouteTableId:
+        Ref: CustomRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: InternetGateway
+
+# Associate main route table with the first private subnet
+  Subnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: RDSPrivateSubnet1
+      RouteTableId:
+        Ref: MainRouteTable
+
+# Associate main route table with the second private subnet
+  Subnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: RDSPrivateSubnet2
+      RouteTableId:
+        Ref: MainRouteTable
+
+# Associate custom route table with the LB public subnet
+  Subnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: BeanstalkLBSubnet1
+      RouteTableId:
+        Ref: CustomRouteTable        
+
+# create a nat gateway
+  NAT:
+    DependsOn: AttachGateway
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+        - EIP
+        - AllocationId
+      SubnetId:
+        Ref: BeanstalkLBSubnet1
+      Tags:
+        - Key: foo
+          Value: bar
+
+# create elastic ip for the nat gateway        
+  EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+# Associate main route table with the nat gateway
+  MainRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: MainRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NAT        
+
+
+# Create first RDS private subnet
+  RDSPrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+        VpcId:
+          Ref: VPC
+        CidrBlock: !Ref RdsPrivateSubnet1Cidr
+        AvailabilityZone:
+          Fn::Select:
+            - 0
+            - Fn::GetAZs: ""
+        Tags:
+        - Key: Name 
+          Value: gocesubnet1
+
+# Create second RDS private subnet
+  RDSPrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+        VpcId:
+          Ref: VPC
+        CidrBlock: !Ref RdsPrivateSubnet2Cidr
+        AvailabilityZone:
+          Fn::Select:
+            - 1
+            - Fn::GetAZs: ""        
+        Tags:
+        - Key: Name 
+          Value: gocesubnet2
+
+
+# Create first Beanstalk LB public subnet
+  BeanstalkLBSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+        VpcId:
+          Ref: VPC
+        CidrBlock: !Ref BeanstalkLBPublicSubnet1Cidr
+        AvailabilityZone:
+          Fn::Select:
+            - 0
+            - Fn::GetAZs: ""
+        Tags:
+        - Key: Name 
+          Value: gocesubnet1
+                          
+
+  # RDS Security Group
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RDS Security Group
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-mysqlrds-sg'
+
+  RDSSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      SubnetIds:
+        - !Ref RDSPrivateSubnet1
+        - !Ref RDSPrivateSubnet2
+
+      DBSubnetGroupDescription: DB Subnet Group for mysql RDS.
+      Tags:
+
+        - Key: Name
+          Value: !Ref AWS::StackName
+
+  #MYSQL RDS DB
+  RDS:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: mysql
+      MultiAZ: true
+      AllowMajorVersionUpgrade: false
+      PubliclyAccessible: false
+      Tags:
+
+        - Key: Name
+          Value: !Ref AWS::StackName
+
+      MasterUsername: !Ref MasterUser
+      MasterUserPassword: !Ref MasterUserPassword
+      AutoMinorVersionUpgrade: true
+      PreferredBackupWindow: 04:00-05:00
+      StorageType: gp2
+      VPCSecurityGroups:
+        - !Ref RDSSecurityGroup
+      DBInstanceIdentifier: !Ref AppAndRdsName
+      AllocatedStorage: !Ref AllocatedStorage
+      DBInstanceClass: !Ref DBInstanceClass
+      DBSubnetGroupName: !Ref RDSSubnetGroup
+      BackupRetentionPeriod: !Ref BackupRetentionPeriod
+      PreferredMaintenanceWindow: Sat:07:00-Sat:08:00
+      StorageEncrypted: !Ref StorageEncrypted
+
+  Application:
+
+    Type: AWS::ElasticBeanstalk::Application
+    Properties:
+      ApplicationName: !Ref AppAndRdsName
+
+
+Outputs:
+
+  VPCid:
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VPC"
+
+  rdsprivatesubnet1:
+    Value: !Ref RDSPrivateSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-rdsprivatesubnet1"      
+
+  rdsprivatesubnet2:
+    Value: !Ref RDSPrivateSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-rdsprivatesubnet2"
+
+  beanstalklbpublicsubnet1:
+    Value: !Ref BeanstalkLBSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-beanstalklbpublicsubnet1"      
+
+  RDSEndpointURL:
+    Value: !GetAtt [ RDS, Endpoint.Address ]
+    Export:
+      Name: !Sub "${AWS::StackName}-rds-endpoint"    
+
+  RDSEndpointPort:
+    Value: !GetAtt [ RDS, Endpoint.Port ]
+    Export:
+      Name: !Sub "${AWS::StackName}-rds-port"
+
+  RDSSG:
+    Value: !Ref RDSSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-rds-sg"      
+
+  BeanstalkAppName:
+    Value: !Ref Application
+    Export: 
+      Name: !Sub "${AWS::StackName}-BeanstalkAppName"
+
+  PrivateSubnets:
+    Description: "private subnet ids"
+    Value:
+      'Fn::Join':
+        [ ","
+        , [ { "Ref" : "RDSPrivateSubnet1" }
+          , { "Ref" : "RDSPrivateSubnet2" }
+          ]
+        ]
+    Export:
+      Name:
+        !Sub "${AWS::StackName}-privatesubnetids"
