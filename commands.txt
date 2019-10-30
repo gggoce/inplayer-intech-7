@@ -1,0 +1,32 @@
+# check node.js version
+node --version
+
+# check npm version
+npm --version  
+
+# check python version
+python --version
+
+# install latest version AWS cdk
+npm install -g aws-cdk
+
+# check cdk version
+cdk --version
+
+# clone workshop code
+git clone https://github.com/gggoce/inplayer-intech-7.git
+
+#choose a random name for the folder "cdk-workshop" from the command below for better visibility in cloudformation console     
+mkdir cdk-workshop && cd cdk-workshop  
+
+# initialize an empty python aws cdk app
+cdk init app --language python
+
+# activate virtualenv for the python app
+source .env/bin/activate
+
+# install required modules
+pip install -r requirements.txt
+
+# set default AWS region
+export AWS_DEFAULT_REGION=eu-central-1
