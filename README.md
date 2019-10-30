@@ -3,7 +3,9 @@
 ![alt text](workshop.png?raw=true "InTech")  
 ---
 ## supported languages and stability
-![alt text](language.png?raw=true)  ![alt text](stability.png?raw=true) 
+![alt text](language.png?raw=true)    
+---
+![alt text](stability.png?raw=true) 
 ---
 ## console login
 - https://431032670952.signin.aws.amazon.com/console  
