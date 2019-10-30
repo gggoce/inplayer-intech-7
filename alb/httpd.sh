@@ -6,7 +6,7 @@ yum install httpd -y
 #enable and start httpd
 systemctl enable httpd
 systemctl start httpd
-echo "<html><head><title> Example Web Server</title></head>" >  /var/www/html/index.html
+echo "<html><head><title> Congrats, your app is running!</title></head>" >  /var/www/html/index.html
 echo "<body>" >>  /var/www/html/index.html
 echo "<div><center><h2>Welcome AWS $(hostname -f) </h2>" >>  /var/www/html/index.html
 echo "<hr/>" >>  /var/www/html/index.html
